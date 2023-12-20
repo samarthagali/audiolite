@@ -90,8 +90,8 @@ def generate_audio(audio, param_path,device):
     sr_audio=sr(audio.unsqueeze(0))
     audio = audio.squeeze(0).cpu().detach()
     sr_audio = sr_audio.squeeze(0).cpu().detach()
-    # print(audio.shape)
-    sample_rate, num_channels, bit_depth, format, max_val, filename = torch.load(os.path.join(param_path,"audio_params.pt"))
+    print(torch.load(os.path.join(param_path,"audio_params.pt")))
+    sample_rate, num_channels, bit_depth, format, max_val, filename,format = torch.load(os.path.join(param_path,"audio_params.pt"))
     sr_output_path="decoder_outputs/reconstructed_sr_"+filename
     output_path ='decoder_outputs/reconstructed_'+filename
     # sr_output_path='decoder_outputs/sr_output'+filename
@@ -105,32 +105,11 @@ def generate_audio(audio, param_path,device):
     audio=(audio*max_val)
     info = torch.finfo(bit_depth)
     print(f"Audio params: {sample_rate}, {num_channels}, {bit_depth}, {format}, {info.bits }\n")
-    torchaudio.save(output_path, audio, sample_rate=sample_rate, bits_per_sample=16)
+    torchaudio.save(output_path, audio, sample_rate=sample_rate, bits_per_sample=16,format=format)
     print(f"Audio saved to {output_path}\n")
-    torchaudio.save(sr_output_path, sr_audio, sample_rate=sample_rate*4, bits_per_sample=16)
+    torchaudio.save(sr_output_path, sr_audio, sample_rate=sample_rate*4, bits_per_sample=16,format=format)
     print(f" SR Audio saved to {sr_output_path}\n")
 
-# def generate_decoder_audio(param_path, scale):
-#    print("Generate Decoder Audio")
-#    freq_factor = pow(2,scale - 1)
-#    scale-=1
-#    for audio in decoder_outputs:
-#         audio = audio.squeeze()
-#         audio_params = torch.load(os.path.join(param_path,"audio_params.pt"))
-#         max_val = torch.load(os.path.join(param_path,"max_vals.pt")).item()
-#         audio=(audio*max_val)
-#         audio=audio.short()
-#         with wave.open(f'decoder_outputs/decoder_audio_{audio.shape[0]}.wav', 'wb') as f:
-#             f.setparams(audio_params)
-#             f.setframerate(f.getframerate() / freq_factor)
-#             print(freq_factor, f.getframerate(),audio.shape)
-#             freq_factor = pow(2,scale - 1)
-#             scale-=1
-#             audio = audio.cpu()
-#             audio = audio.detach()
-#             audio = audio.numpy()
-#             f.writeframes(audio.tobytes())
-      
 
 if __name__ == "__main__":
     main()

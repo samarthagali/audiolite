@@ -48,9 +48,9 @@ def read_audio(file_path, device):
     # Read audio file using torchaudio
     print(f"Loading Audio: {file_path}\n")
     format = file_path.split(".")[-1]
+    print(format)
     filename = file_path.split("/")[-1]
-    # print(type(file_path),file_path.split(".")[-1].upper(), file_path.split("/")[-1])
-    waveform, sample_rate = torchaudio.load(file_path)
+    waveform, sample_rate = torchaudio.load(file_path,format=format)
     num_channels = waveform.shape[0]
     max_val = torch.max(waveform)
     waveform = pad_audio(waveform,sample_rate)
@@ -64,7 +64,7 @@ def read_audio(file_path, device):
     # Get properties of the audio file
     bit_depth = waveform.dtype
 
-    return (waveform, (sample_rate, num_channels, bit_depth, format, max_val, filename))
+    return (waveform, (sample_rate, num_channels, bit_depth, format, max_val, filename,format))
 
 def normalize_torch(segment):
     max_val = torch.max(torch.abs(segment))
@@ -92,6 +92,7 @@ def main():
     audio_data = read_audio(audio_path,device)
     audio_data,params = audio_data[0],audio_data[1]
     max_val=params[4]
+    print(params)
     encoder = torch.load(encoder_path,map_location=device).to(device)
     scale = 3
     print("compressing")
