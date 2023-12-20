@@ -16,13 +16,13 @@ def run_enc_dec(arg1,arg2):
     # # Assign command-line arguments to variables
     # arg1 = sys.argv[1]
     # arg2 = sys.argv[2]
-    command = ["python", "encoder.py", arg1, arg2]
+    command = ["python", "encode.py", arg1, arg2]
 
     # Run the command
     process = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     print(process.stdout,process.stderr )
 
-    command = ["python", "decoder.py", arg1]
+    command = ["python", "decode.py", arg1]
 
     # Run the command
     process = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -59,7 +59,7 @@ def perform_evaluation(samples_dir, models_path="model_weights/"):
     for audio_file in audio_files:
         format = audio_file[-4:]
         audio_path = os.path.join(samples_dir,audio_file)
-        output_path = 'decoder_outputs/output_audio' + format
+        output_path = 'decoder_outputs/reconstructed_' + audio_file 
         print("Paths:",audio_path,output_path)
         run_enc_dec(models_path, audio_path)
         input_audio, input_sr = torchaudio.load(audio_path)
@@ -68,7 +68,7 @@ def perform_evaluation(samples_dir, models_path="model_weights/"):
         print("Shapes:",input_audio.shape, output_audio.shape)
 
         if input_audio.shape != output_audio.shape:
-            input_audio = input_audio[0,:min(input_audio.shape[1],output_audio.shape[1])].unsqueeze(0)
+            input_audio = input_audio[:,:min(input_audio.shape[1],output_audio.shape[1])]
             output_audio = output_audio[:,:min(input_audio.shape[1],output_audio.shape[1])]
 
         print("Trimmed Shapes:",input_audio.shape, output_audio.shape)
@@ -102,7 +102,7 @@ def perform_evaluation(samples_dir, models_path="model_weights/"):
 
 def main():
     samples_dir = "samples/"
-    perform_evaluation(samples_dir,"models")
+    perform_evaluation(samples_dir)
 
 if __name__ == "__main__":
     main()
