@@ -14,21 +14,10 @@ def check_and_create_dirs():
       os.mkdir("decoder_outputs")
 
 
-
-# def read_audio(file, device):
-#    with wave.open(file, mode=None) as f:
-#         audio_params = f.getparams()
-#         print(audio_params)
-#         raw_audio = f.readframes(audio_params[3])
-#         # raw_audio = f.readframes(80000)
-#         audio = np.frombuffer(raw_audio,dtype="int16")
-#         print(audio.shape)
-#         max_val=np.array(audio.max().astype("float32"))
-#         print("Before normalizing: ",audio.min(),audio.max())
-#         audio = normalize_segment(audio).astype("float32")
-#         print("After normalizing: ",audio.min(),audio.max())
-#         audio = torch.from_numpy(audio).unsqueeze(0).to(device)
-#         return (audio,audio_params),max_val
+def create_batches(audio, sample_length):
+    # Reshape into batches of 5-second samples
+    batched_audio = audio.view(-1, sample_length)  # Assuming dual channel audio
+    return batched_audio
 def pad_audio(tensor, frame_rate):
     # Get lengths of each channel
     channel_length = tensor.size(1)
@@ -48,24 +37,16 @@ def read_audio(file_path, device):
     # Read audio file using torchaudio
     print(f"Loading Audio: {file_path}\n")
     format = file_path.split(".")[-1]
-    print(format)
     filename = file_path.split("/")[-1]
     waveform, sample_rate = torchaudio.load(file_path,format=format)
     num_channels = waveform.shape[0]
     max_val = torch.max(waveform)
-    waveform = pad_audio(waveform,sample_rate)
-    # print("Padded", waveform.shape)
+    waveform = pad_audio(waveform,sample_rate*2)
     waveform = torch.flatten(waveform)
-    # print("Flattened", waveform.shape)
     print("Normalizing Audio\n")
     waveform = normalize_torch(waveform).unsqueeze(0).to(device)
-    # print("Normalized", waveform.shape)
-    
-    # Get properties of the audio file
     bit_depth = waveform.dtype
-
-    return (waveform, (sample_rate, num_channels, bit_depth, format, max_val, filename,format))
-
+    return (waveform, (sample_rate, num_channels, bit_depth, format, max_val, filename))
 def normalize_torch(segment):
     max_val = torch.max(torch.abs(segment))
     if max_val == 0:
@@ -76,7 +57,7 @@ def normalize_torch(segment):
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(torch.__version__,device)
+    print("running on: ",device)
     parser = argparse.ArgumentParser()
     parser.add_argument('models_path', type=str, help='Path to models directory\n models should contain both encoder and decoder')
     parser.add_argument('audio_path', type=str, help='Path to audio file')
@@ -92,7 +73,7 @@ def main():
     audio_data = read_audio(audio_path,device)
     audio_data,params = audio_data[0],audio_data[1]
     max_val=params[4]
-    print(params)
+    print(f"audio params:{params}")
     encoder = torch.load(encoder_path,map_location=device).to(device)
     scale = 3
     print("compressing")
@@ -109,21 +90,31 @@ def normalize_segment(segment):
     return segment/max_val
 
 
+
+
+
 def gen_compressed_files(model, audio_data,audio_params, scale,max_val):
     check_and_create_dirs()
-    # audio,audio_params = audio_data
-    audio=audio_data
+    audio= audio_data
+    batch_length = audio_params[0]*2
+    batched_audio = create_batches(audio, batch_length).unsqueeze(1)
+    print(f"Original: {audio.shape}, Batched Shape:{batched_audio.shape}\n")
     enc_outputs = []
-    x = audio
+    x = batched_audio
     for i in range(scale):
-        x, res = model(x)
-        if x.shape[-1]%2 == 1:
-           x = torch.nn.functional.pad(x, (0, 1), mode='constant', value=0)
-           res = torch.nn.functional.pad(res, (0, 1), mode='constant', value=0)
-        print(x.shape,res.shape,x,res)
-        enc_outputs.append(res)
-    write_files(enc_outputs, audio_params, max_val)
-
+        x2,res = [], []
+        print(f"Scale {i+1}: {x.shape}\n")
+        for input_batch in x:
+            if input_batch.shape[-1]%2 == 1:
+                input_batch = torch.nn.functional.pad(input_batch, (0, 1), mode='constant', value=0)
+            out1, out2 = model(input_batch)
+            x2.append(out1)
+            res.append(out2)  
+        x = torch.stack(x2)
+        res = torch.stack(res)
+           
+        enc_outputs.append(res.to(torch.float16))
+    write_files(enc_outputs, audio_params,max_val)
 def write_files(files, audio_params, max_val):
     torch.save(max_val,"compressed_files/max_vals.pt")
 
